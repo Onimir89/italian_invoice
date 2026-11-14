@@ -37,14 +37,29 @@ class TestAperture(IntegrationTestCase):
 		doc = self._fattura().insert(ignore_permissions=True)
 		self.assertEqual(doc.naming_series, "SINV/.YY./")
 
-	def test_apertura_solo_per_accounts_manager(self):
+	def _utente(self, email, ruolo):
+		if not frappe.db.exists("User", email):
+			frappe.get_doc({"doctype": "User", "email": email, "first_name": ruolo, "send_welcome_email": 0,
+				"roles": [{"role": ruolo}]}).insert(ignore_permissions=True)
+		return email
+
+	def test_apertura_negata_a_chi_non_tiene_la_contabilita(self):
 		doc = self._fattura(is_opening="Yes")
-		frappe.set_user("Guest")
+		frappe.set_user(self._utente("fase36-sales@example.com", "Sales User"))
 		with self.assertRaisesRegex(frappe.ValidationError, "Accounts Manager"):
 			before_submit.execute(doc)
 
-	def test_apertura_con_accounts_manager_passa(self):
-		before_submit.execute(self._fattura(is_opening="Yes"))  # Administrator has every role
+	def test_apertura_permessa_ad_accounts_manager_e_system_manager(self):
+		for email, ruolo in (("fase36-am@example.com", "Accounts Manager"), ("fase36-sm@example.com", "System Manager")):
+			frappe.set_user(self._utente(email, ruolo))
+			before_submit.execute(self._fattura(is_opening="Yes"))
+
+	def test_apertura_non_si_cambia_dopo_il_salvataggio(self):
+		frappe.db.set_value("Company", COMPANY, "custom_numero_alla_conferma", 0)
+		doc = self._fattura().insert(ignore_permissions=True)
+		doc.is_opening = "Yes"
+		with self.assertRaisesRegex(frappe.ValidationError, "apertura"):
+			doc.save()
 
 
 class TestAnnullamento(IntegrationTestCase):
@@ -65,7 +80,7 @@ class TestAnnullamento(IntegrationTestCase):
 		return doc
 
 	def test_trasmessa_non_si_annulla(self):
-		for stato in ("Inviata", "RC", "MC", "DT", "EC01", "EC02"):
+		for stato in ("Inviata", "RC", "MC", "DT", "EC01", "EC02", "Annullata"):
 			doc = self._confermata(stato)
 			with self.assertRaisesRegex(frappe.ValidationError, "nota di credito"):
 				doc.cancel()
@@ -77,8 +92,36 @@ class TestAnnullamento(IntegrationTestCase):
 			self.assertEqual(doc.docstatus, 2)
 
 
+IT_COMPANY = "_Test Fase36 Italia"
+
+
 class TestPuliziaXmlCore(IntegrationTestCase):
-	def test_solo_il_nome_dell_xml_del_core(self):
-		self.assertTrue(on_submit.is_core_xml_name("IT01234567890_00012.xml", "IT01234567890"))
-		self.assertFalse(on_submit.is_core_xml_name("IT01234567890_contratto.xml", "IT01234567890"))
-		self.assertFalse(on_submit.is_core_xml_name("IT01234567890_00012.xml.p7m", "IT01234567890"))
+	"""on_submit on an Italian company with real File rows: the core XML goes, also when Frappe
+	renamed it after a name clash with an XML already on disk; anything else stays."""
+
+	@classmethod
+	def setUpClass(cls):
+		super().setUpClass()
+		_crea_anagrafiche()
+		if not frappe.db.exists("Company", IT_COMPANY):
+			frappe.get_doc({"doctype": "Company", "company_name": IT_COMPANY, "abbr": "_TF36", "default_currency": "EUR",
+				"country": "Italy", "tax_id": "01234567890", "custom_codice_sistema_interscambio": "0000000"}).insert(ignore_permissions=True)
+		cls.customer = frappe.db.get_value("Customer", {"customer_name": CUSTOMER}, "name")
+
+	def test_toglie_l_xml_del_core_anche_rinominato(self):
+		frappe.db.set_value("Company", COMPANY, "custom_numero_alla_conferma", 0)
+		fattura = frappe.get_doc({
+			"doctype": "Sales Invoice", "company": COMPANY, "customer": self.customer, "currency": "EUR",
+			"items": [{"item_code": ITEM, "qty": 1, "rate": 100}],
+		}).insert(ignore_permissions=True)
+		nomi = ["IT01234567890_00012.xml", "IT01234567890_00012a1b2c3.xml", "IT01234567890_contratto.xml", "nota.xml"]
+		for nome in nomi:
+			frappe.get_doc({"doctype": "File", "file_name": nome, "content": "<x/>", "is_private": 1,
+				"attached_to_doctype": "Sales Invoice", "attached_to_name": fattura.name}).insert(ignore_permissions=True)
+		on_submit.execute(frappe._dict(doctype="Sales Invoice", name=fattura.name, company=IT_COMPANY, is_opening="No"))
+		rimasti = sorted(frappe.get_all("File", filters={"attached_to_name": fattura.name}, pluck="file_name"))
+		self.assertEqual(rimasti, ["IT01234567890_contratto.xml", "nota.xml"])
+
+	def test_societa_estera_non_tocca_nulla(self):
+		self.assertFalse(on_submit.is_italian(COMPANY))
+		self.assertTrue(on_submit.is_italian(IT_COMPANY))

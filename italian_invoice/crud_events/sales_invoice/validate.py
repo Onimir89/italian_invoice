@@ -1,4 +1,5 @@
 import frappe
+from frappe import _
 
 
 def get_original_invoice(doc):
@@ -86,6 +87,13 @@ def manage_split_payment(doc, customer):
 
 
 def execute(doc, method=None):
+	# Fase #36: the series (APERT or SINV) is chosen at insert from is_opening; changing it later
+	# would put a SINV number on an opening invoice or an APERT number on one sent to SDI.
+	if not doc.is_new() and doc.has_value_changed("is_opening"):
+		frappe.throw(_("Sales Invoice {0}: «fattura di apertura» non si cambia dopo il salvataggio: crea una fattura nuova.").format(doc.name))
+	if doc.amended_from and doc.is_opening != frappe.db.get_value("Sales Invoice", doc.amended_from, "is_opening"):
+		frappe.throw(_("Sales Invoice {0}: la rettifica deve restare {1} come l'originale.").format(doc.name, "di apertura" if doc.is_opening != "Yes" else "non di apertura"))
+
 	if doc.is_return:
 		original_invoice = get_original_invoice(doc)
 

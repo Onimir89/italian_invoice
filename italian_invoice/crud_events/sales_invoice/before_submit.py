@@ -20,8 +20,9 @@ def execute(doc, method=None):
 	# Saltano i controlli SDI, quindi le conferma solo chi tiene la contabilità (#36): una
 	# fattura vera marcata «apertura» da API o import non esce senza XML.
 	if doc.is_opening == "Yes":
-		if "Accounts Manager" not in frappe.get_roles():
-			frappe.throw(_("Sales Invoice {0}: solo un Accounts Manager può confermare una fattura di apertura.").format(doc.name))
+		# System Manager: the Opening Invoice Creation Tool is his by default.
+		if not {"Accounts Manager", "System Manager"} & set(frappe.get_roles()):
+			frappe.throw(_("Sales Invoice {0}: solo un Accounts Manager (o System Manager) può confermare una fattura di apertura.").format(doc.name))
 		return
 
 	if frappe.get_cached_value("Company", doc.company, "country") != "Italy":
