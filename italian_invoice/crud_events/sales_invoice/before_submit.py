@@ -18,6 +18,11 @@ def execute(doc, method=None):
 	if frappe.get_cached_value("Company", doc.company, "country") != "Italy":
 		return
 
+	# Fase: le fatture di apertura (Opening Invoice Creation Tool) riportano saldi di fatture
+	# già emesse e non vanno allo SDI; anche il core le salta (regional/italy/utils.py).
+	if doc.is_opening == "Yes":
+		return
+
 	# Il Tipo di Documento (TD01, TD24, …) finisce nell'XML: obbligatorio al submit.
 	# Enforcement qui e non con reqd sul Custom Field, che bloccherebbe anche le
 	# fatture delle società estere (il metadato non distingue il paese).

@@ -249,6 +249,8 @@ doc_events = {
 			# Numero definitivo solo dopo le validazioni: il lock sulla serie dura meno.
 			"italian_invoice.crud_events.sales_invoice.numerazione.before_submit",
 		],
+		# Fase: no core XML (generic N6) next to ours, see crud_events/sales_invoice/on_submit.py
+		"on_submit": "italian_invoice.crud_events.sales_invoice.on_submit.execute",
 	},
 	"Payment Entry": {
 		"validate": [
