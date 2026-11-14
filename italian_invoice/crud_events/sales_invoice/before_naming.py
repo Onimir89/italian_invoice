@@ -14,6 +14,12 @@ def execute(doc, method=None):
 	if doc.amended_from:
 		return
 
+	# Fase #36: opening invoices (Opening Invoice Creation Tool) restate invoices already
+	# issued and never go to SDI: own series, so they consume no SINV number.
+	if doc.is_opening == "Yes":
+		doc.naming_series = "APERT/.YY./"
+		return
+
 	if doc.is_return:
 		doc.naming_series = "NCINV/.YY./"
 		return

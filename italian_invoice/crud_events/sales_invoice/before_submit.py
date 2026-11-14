@@ -15,12 +15,16 @@ def execute(doc, method=None):
 	Vale solo per le società italiane: la fattura elettronica (SDI) è un obbligo
 	italiano — le fatture di società estere (es. svizzere) non passano da SDI.
 	"""
-	if frappe.get_cached_value("Company", doc.company, "country") != "Italy":
-		return
-
 	# Fase: le fatture di apertura (Opening Invoice Creation Tool) riportano saldi di fatture
 	# già emesse e non vanno allo SDI; anche il core le salta (regional/italy/utils.py).
+	# Saltano i controlli SDI, quindi le conferma solo chi tiene la contabilità (#36): una
+	# fattura vera marcata «apertura» da API o import non esce senza XML.
 	if doc.is_opening == "Yes":
+		if "Accounts Manager" not in frappe.get_roles():
+			frappe.throw(_("Sales Invoice {0}: solo un Accounts Manager può confermare una fattura di apertura.").format(doc.name))
+		return
+
+	if frappe.get_cached_value("Company", doc.company, "country") != "Italy":
 		return
 
 	# Il Tipo di Documento (TD01, TD24, …) finisce nell'XML: obbligatorio al submit.
