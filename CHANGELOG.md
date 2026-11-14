@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [16+fase.2] - 2026-11-14 (tag `v16-fase.2`)
+
+### Changed
+- Fatture di apertura su una serie propria `APERT/.YY./`; il flag di apertura non cambia più dopo il salvataggio e l'emendamento lo conserva.
+- La conferma di una fattura di apertura è riservata ad Accounts Manager e System Manager.
+- Annullamento consentito solo se la fattura non è stata consegnata allo SDI (stato letto dalla Transazione SDI: non inviata, NS, inviata in test o vuoto).
+- Alla conferma la pulizia dell'XML generico del core (N6) tocca solo i file `<partita IVA>_<progressivo>.xml`, solo per le società italiane, e salta le aperture.
+
+## [16+fase.1] - 2026-11-14 (tag `v16-fase.1`)
+
+### Changed
+- Niente XML generico del core (N6) alla conferma; fatture di apertura fuori dai controlli SDI.
+
+## [16+fase.0] - 2026-10-17 (tag `v16-fase.0`)
+
+### Changed
+- Allineamento a Frappe/ERPNext 16.50 (validazione e navigazione), numero fattura alla conferma, AliquotaIVA di riga da `item_wise_tax_details`.
+- Niente CodiceFiscale del cessionario quando è la copia della Partita IVA (scarto SDI 00324).
+
 ## [1.0.1] - 2025-01-27
 
 ### Changed
